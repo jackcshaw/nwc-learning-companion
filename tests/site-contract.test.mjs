@@ -57,6 +57,20 @@ assert(!html.includes("class=\"top-nav\""), "site should not include a competing
 assert(!html.includes("class=\"hero-actions\""), "site should not include duplicate hero mode controls");
 assert(html.includes("class=\"mode-switch\""), "site should include one clean mode switch");
 assert(html.includes("class=\"article-shell\""), "site should use the clean article frame");
+assert(html.includes("data-toc-link="), "essay table of contents should expose progress-aware links");
+assert(
+  !html.includes('data-toc-link="teaching-frame-literacy-as-a-leadership-competency-at-nwc"'),
+  "essay table of contents should skip the suppressed subtitle heading",
+);
+assert(
+  html.includes('body:not([data-active-mode="essay"]) .toc'),
+  "essay navigation should be hidden outside essay mode",
+);
+assert(html.includes(".toc::after"), "essay navigation should include a fill layer for reading progress");
+assert(html.includes("--toc-progress"), "essay navigation should expose a progress variable");
+assert(html.includes("function updateTocProgress()"), "site should update essay navigation as the reader scrolls");
+assert(html.includes("classList.toggle(\"is-active\""), "site should mark the active essay section");
+assert(html.includes("classList.toggle(\"is-past\""), "site should mark completed essay sections");
 assert(html.includes("data-copy-target=\"setup-prompt\""), "companion should include a copyable setup prompt");
 assert(html.includes("navigator.clipboard.writeText"), "copy buttons should write prompt text to the clipboard");
 assert(!html.includes("## Purpose"), "companion tab should not render the old markdown appendix as its primary surface");

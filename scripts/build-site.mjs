@@ -50,7 +50,7 @@ if (!existsSync(pdfPath)) {
   throw new Error("PDF asset was not generated");
 }
 
-const essayToc = collectHeadings(essayMarkdown);
+const essayToc = collectHeadings(essayMarkdown, { skipFirstH2: true });
 const essayHtml = placeEssayFigures(
   renderMarkdown(essayMarkdown, { skipFirstH1: true, skipFirstH2: true }),
 );
@@ -83,7 +83,7 @@ function buildHtml({ essayToc, essayHtml, companionModeHtml, facultyGuideHtml })
   <main id="top" class="article-shell">
     <aside class="toc" aria-label="Essay sections">
       ${essayToc
-        .map((item, index) => `<a href="#${item.id}"><span></span>${index + 1}. ${escapeHtml(item.text)}</a>`)
+        .map((item, index) => `<a href="#${item.id}" data-toc-link="${item.id}"><span></span>${index + 1}. ${escapeHtml(item.text)}</a>`)
         .join("\n      ")}
     </aside>
 
@@ -403,13 +403,19 @@ function sourceItem(title, body) {
   </article>`;
 }
 
-function collectHeadings(markdown) {
+function collectHeadings(markdown, options = {}) {
+  let skippedFirstH2 = false;
+
   return markdown
     .split("\n")
     .filter((line) => line.startsWith("## "))
-    .map((line) => {
+    .flatMap((line) => {
+      if (options.skipFirstH2 && !skippedFirstH2) {
+        skippedFirstH2 = true;
+        return [];
+      }
       const text = line.replace(/^##\s+/u, "").trim();
-      return { text, id: slugify(text) };
+      return [{ text, id: slugify(text) }];
     });
 }
 
@@ -552,6 +558,70 @@ function slugify(value) {
 function clientJs() {
   return `const buttons = Array.from(document.querySelectorAll("[data-mode-tab]"));
 const views = Array.from(document.querySelectorAll("[data-mode]"));
+const toc = document.querySelector(".toc");
+const tocEntries = Array.from(document.querySelectorAll("[data-toc-link]"))
+  .map((link) => ({ link, heading: document.getElementById(link.dataset.tocLink) }))
+  .filter((entry) => entry.heading);
+let tocFrame = null;
+
+function clamp(value, min, max) {
+  return Math.max(min, Math.min(max, value));
+}
+
+function dotCenterY(entry) {
+  const dot = entry.link.querySelector("span");
+  if (!toc || !dot) return 0;
+  const tocRect = toc.getBoundingClientRect();
+  const dotRect = dot.getBoundingClientRect();
+  return dotRect.top - tocRect.top + dotRect.height / 2;
+}
+
+function updateTocProgress() {
+  if (!toc || !tocEntries.length) return;
+  if (document.body.dataset.activeMode !== "essay") {
+    toc.style.setProperty("--toc-progress", "0px");
+    tocEntries.forEach(({ link }) => {
+      link.classList.remove("is-active", "is-past");
+    });
+    return;
+  }
+
+  const marker = window.scrollY + Math.min(window.innerHeight * 0.36, 280);
+  const positions = tocEntries.map(({ heading }) => heading.getBoundingClientRect().top + window.scrollY);
+  let activeIndex = 0;
+
+  positions.forEach((top, index) => {
+    if (top <= marker) {
+      activeIndex = index;
+    }
+  });
+
+  const firstY = dotCenterY(tocEntries[0]);
+  const lastY = dotCenterY(tocEntries[tocEntries.length - 1]);
+  const activeY = dotCenterY(tocEntries[activeIndex]);
+  const nextEntry = tocEntries[Math.min(activeIndex + 1, tocEntries.length - 1)];
+  const nextY = dotCenterY(nextEntry);
+  const activeTop = positions[activeIndex];
+  const nextTop = positions[Math.min(activeIndex + 1, positions.length - 1)] || activeTop + window.innerHeight;
+  const sectionProgress = nextTop === activeTop ? 0 : clamp((marker - activeTop) / (nextTop - activeTop), 0, 1);
+  const fillY = activeY + (nextY - activeY) * sectionProgress;
+
+  toc.style.setProperty("--toc-fill-top", firstY + "px");
+  toc.style.setProperty("--toc-progress", clamp(fillY - firstY, 0, lastY - firstY) + "px");
+
+  tocEntries.forEach(({ link }, index) => {
+    link.classList.toggle("is-active", index === activeIndex);
+    link.classList.toggle("is-past", index < activeIndex);
+  });
+}
+
+function requestTocUpdate() {
+  if (tocFrame !== null) return;
+  tocFrame = window.requestAnimationFrame(() => {
+    tocFrame = null;
+    updateTocProgress();
+  });
+}
 
 function setMode(mode, shouldScroll = true) {
   document.body.dataset.activeMode = mode;
@@ -568,16 +638,21 @@ function setMode(mode, shouldScroll = true) {
   if (shouldScroll) {
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
+  requestTocUpdate();
 }
 
 buttons.forEach((button) => {
   button.addEventListener("click", () => setMode(button.dataset.modeTab));
 });
 
+window.addEventListener("scroll", requestTocUpdate, { passive: true });
+window.addEventListener("resize", requestTocUpdate);
+
 const initial = location.hash.replace("#", "");
 if (["essay", "companion", "guide"].includes(initial)) {
   setMode(initial, false);
 }
+requestTocUpdate();
 
 document.querySelectorAll("[data-copy-target]").forEach((button) => {
   button.addEventListener("click", async () => {
@@ -686,6 +761,12 @@ button:active,
   padding: 42px 28px 132px;
 }
 
+body:not([data-active-mode="essay"]) .article-shell {
+  grid-template-columns: minmax(0, 800px);
+  justify-content: center;
+  max-width: 856px;
+}
+
 .content-frame {
   min-width: 0;
   padding-top: 5px;
@@ -747,6 +828,8 @@ h1 {
 }
 
 .toc {
+  --toc-fill-top: 7px;
+  --toc-progress: 0px;
   position: sticky;
   top: 28px;
   align-self: start;
@@ -755,9 +838,14 @@ h1 {
   padding: 0 0 22px;
 }
 
+body:not([data-active-mode="essay"]) .toc {
+  display: none;
+}
+
 .toc::before {
   content: "";
   position: absolute;
+  z-index: 0;
   left: 9px;
   top: 7px;
   bottom: 14px;
@@ -765,8 +853,22 @@ h1 {
   background: #c9c5c0;
 }
 
+.toc::after {
+  content: "";
+  position: absolute;
+  z-index: 0;
+  left: 9px;
+  top: var(--toc-fill-top);
+  width: 1px;
+  height: var(--toc-progress);
+  max-height: calc(100% - var(--toc-fill-top) - 14px);
+  background: var(--ink);
+  transition: height 140ms linear;
+}
+
 .toc a {
   position: relative;
+  z-index: 1;
   display: block;
   min-height: 31px;
   margin: 0 0 15px;
@@ -774,6 +876,7 @@ h1 {
   color: #918d89;
   font: 500 13px/1.35 ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   text-decoration: none;
+  transition: color 160ms ease;
 }
 
 .toc a span {
@@ -785,10 +888,30 @@ h1 {
   border: 1px solid #9b9792;
   border-radius: 50%;
   background: var(--paper);
+  transition: background-color 160ms ease, border-color 160ms ease, box-shadow 160ms ease;
 }
 
 .toc a:hover {
   color: var(--ink);
+}
+
+.toc a.is-active,
+.toc a.is-past {
+  color: var(--ink);
+}
+
+.toc a.is-active {
+  font-weight: 750;
+}
+
+.toc a.is-active span,
+.toc a.is-past span {
+  border-color: var(--ink);
+  background: var(--ink);
+}
+
+.toc a.is-active span {
+  box-shadow: 0 0 0 4px var(--paper);
 }
 
 .article-body {
