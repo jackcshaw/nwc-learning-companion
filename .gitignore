@@ -1,0 +1,12 @@
+.DS_Store
+.firebase/
+.superpowers/
+tmp/
+node_modules/
+
+# Generated build output
+dist/
+
+# Separate local drafting lane, not part of this public companion repo
+cyber-apprenticeship-proof-draft.md
+
