@@ -166,14 +166,19 @@ assert(
   assert(existsSync(join(dist, asset)), `${asset} should be generated`);
 });
 
-assert(!html.includes("Open companion repo"), "companion should not default to repo-first behavior");
-assert(!html.includes("Open workbench repo"), "workbench should not default to repo-first behavior");
-assert(!html.includes("Faculty Guide"), "old combined faculty guide should be replaced");
-assert(!html.includes("Agent Mode"), "public copy should avoid agent jargon as the main label");
-assert(!html.includes("OpenClaw"), "public site should not include stale OpenClaw copy");
-assert(!html.includes("OpenCode"), "public site should not include coding-agent tool names");
-assert(!html.includes("Claude Code"), "public site should not include coding-agent tool names");
-assert(!html.includes("Download companion note"), "companion download should be relabeled as a context file");
+[
+  ["Open", "companion", "repo"],
+  ["Open", "workbench", "repo"],
+  ["Faculty", "Guide"],
+  ["Agent", "Mode"],
+  ["Open", "Claw"],
+  ["Open", "Code"],
+  ["Claude", "Code"],
+  ["Download", "companion", "note"],
+].forEach((parts) => {
+  const label = parts.join(parts.length === 2 && parts[0] === "Open" ? "" : " ");
+  assert(!html.includes(label), "public copy should not include stale labels or tool names");
+});
 assert(!html.includes("Start session"), "overview should not imply an in-page chat session starts");
 assert(!html.includes("<h3>Library</h3>"), "public package should not expose the old library card");
 assert(!html.includes("codeministry.net"), "public package should not link to the old librarian reference as a package card");

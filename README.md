@@ -12,7 +12,7 @@ by ChatGPT, Claude, Gemini, or another AI assistant.
 
 The source material behind the Companion lives in:
 
-- AI Companion source: https://github.com/jackcshaw/nwc-irreducible-officer-agent-mode
+- AI Companion source: https://github.com/jackcshaw/nwc-irreducible-officer-companion
 - Faculty Workbench source: https://github.com/jackcshaw/nwc-faculty-workbench
 
 It should not contain private course materials, Proof scratch files,
