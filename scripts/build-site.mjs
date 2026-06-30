@@ -415,7 +415,7 @@ function buildWorkbenchMode(tools) {
       </p>
     </section>
 
-    <section class="tool-grid" aria-label="Faculty workbench tools">
+    <section id="workbench-tools" class="tool-grid" aria-label="Faculty workbench tools">
       ${tools.map((tool) => workbenchCard(tool)).join("\n      ")}
     </section>
 
@@ -428,6 +428,7 @@ function buildWorkbenchMode(tools) {
         <div class="tool-actions">
           <button class="copy-button primary" type="button" data-copy-target="workbench-template">Copy template</button>
           <a id="selected-tool-download" class="quiet-action" href="assets/workbench/${selected.filename}" download>Download template</a>
+          <button class="quiet-action" type="button" data-workbench-tools-link>Back to tools</button>
         </div>
       </div>
       <div class="template-layout">
@@ -1386,6 +1387,15 @@ document.querySelectorAll("[data-tool-id]").forEach((button) => {
         scrollElementBelowNav(selectedTool, { behavior: "smooth" });
       }
     });
+  });
+});
+
+document.querySelectorAll("[data-workbench-tools-link]").forEach((button) => {
+  button.addEventListener("click", () => {
+    const toolGrid = document.getElementById("workbench-tools");
+    if (toolGrid) {
+      scrollElementBelowNav(toolGrid, { behavior: "smooth" });
+    }
   });
 });
 
